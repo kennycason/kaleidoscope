@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kaleidoscope</title>
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
+      #gl { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; cursor: grab; touch-action: none; }
+      #gl.dragging { cursor: grabbing; }
+
+      #hud {
+        position: fixed; top: 12px; left: 12px;
+        font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+        color: #eee; background: rgba(0,0,0,0.45);
+        backdrop-filter: blur(8px);
+        border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 10px; padding: 12px 14px; max-width: 260px;
+        user-select: none; z-index: 3;
+        transition: opacity 0.25s ease;
+      }
+      #hud.hidden { opacity: 0; pointer-events: none; }
+      #toast {
+        position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%);
+        font: 600 13px ui-monospace, monospace; letter-spacing: 0.04em;
+        color: #fff; background: rgba(0,0,0,0.6); backdrop-filter: blur(8px);
+        border: 1px solid rgba(255,255,255,0.15);
+        padding: 8px 16px; border-radius: 999px; z-index: 4;
+        opacity: 0; transition: opacity 0.2s ease; pointer-events: none;
+      }
+      #toast.show { opacity: 1; }
+      #hud h1 { font-size: 13px; margin: 0 0 8px; letter-spacing: 0.08em; text-transform: uppercase; }
+      #hud .row { display: flex; justify-content: space-between; gap: 10px; opacity: 0.85; }
+      #hud kbd {
+        background: rgba(255,255,255,0.12); border-radius: 4px;
+        padding: 1px 5px; font-size: 11px;
+      }
+      #hud .hint { margin-top: 8px; opacity: 0.6; font-size: 11px; }
+      #drop {
+        position: fixed; inset: 0; display: none;
+        align-items: center; justify-content: center;
+        font: 600 20px ui-monospace, monospace; color: #fff;
+        background: rgba(20,0,40,0.6); border: 3px dashed rgba(255,255,255,0.5);
+        pointer-events: none;
+      }
+      #drop.show { display: flex; }
+    </style>
+  </head>
+  <body>
+    <canvas id="gl"></canvas>
+    <div id="hud">
+      <h1>Kaleidoscope</h1>
+      <div class="row"><span><kbd>A</kbd></span><span>auto mode (hands-free)</span></div>
+      <div class="row"><span>drag</span><span>pan chamber</span></div>
+      <div class="row"><span>wheel</span><span>zoom</span></div>
+      <div class="row"><span><kbd>Space</kbd></span><span>auto-drift</span></div>
+      <div class="row"><span><kbd>R</kbd></span><span>spin</span></div>
+      <div class="row"><span><kbd>1</kbd>/<kbd>2</kbd></span><span>triangle type</span></div>
+      <div class="row"><span><kbd>L</kbd></span><span>lasers</span></div>
+      <div class="row"><span><kbd>V</kbd></span><span>lens (prism / fly-eye / fisheye)</span></div>
+      <div class="row"><span><kbd>W</kbd></span><span>warp mirror</span></div>
+      <div class="row"><span><kbd>G</kbd></span><span>neon edge glow</span></div>
+      <div class="row"><span><kbd>C</kbd></span><span>hue cycle</span></div>
+      <div class="row"><span><kbd>P</kbd></span><span>procedural / image bg</span></div>
+      <div class="row"><span><kbd>I</kbd></span><span>next image</span></div>
+      <div class="row"><span><kbd>M</kbd></span><span>drift across image</span></div>
+      <div class="row"><span><kbd>H</kbd></span><span>hide this menu</span></div>
+      <div class="row"><span><kbd>&uarr;</kbd><kbd>&darr;</kbd></span><span>tune last setting</span></div>
+      <div class="row"><span><kbd>&larr;</kbd><kbd>&rarr;</kbd></span><span>tune its 2nd knob</span></div>
+      <div class="row"><span><kbd>Z</kbd></span><span>reset parameters</span></div>
+      <div class="hint">drop an image anywhere to use it as the background</div>
+    </div>
+    <div id="toast"></div>
+    <div id="drop">drop image to load</div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
