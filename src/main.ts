@@ -66,6 +66,8 @@ const loc = {
   laserGlow: u("uLaserGlow"),
   lens: u("uLens"),
   lensAmt: u("uLensAmt"),
+  palette: u("uPalette"),
+  foldIters: u("uFoldIters"),
 };
 
 // ---- background texture ---------------------------------------------------
@@ -235,6 +237,11 @@ const laserCol = new Float32Array(15);
 const LENS_NAMES = ["off", "round (fisheye)", "compound (fly eye)", "prism"];
 const lens = { mode: 0, amt: 1.0 };
 
+// Procedural palette phase: advances continuously so the plasma background
+// drifts smoothly through the shader's palette bank. ~33s per palette.
+let palettePhase = 0;
+const PALETTE_SPEED = 0.03;
+
 // Autopilot ("A"): hands-free continual evolution. While on, it drives every
 // parameter from slow sine LFOs and fires occasional discrete scene changes
 // (switch triangle, cycle image, swap background, change lens). `time` only
@@ -242,9 +249,9 @@ const lens = { mode: 0, amt: 1.0 };
 const auto = {
   on: false,
   time: 0,
+  rate: 0.7, // global tempo for everything auto drives (tune live with Up/Down)
   triTimer: 0,
   imgTimer: 0,
-  bgTimer: 0,
   lensTimer: 0,
   laserTimer: 0,
 };
@@ -284,7 +291,7 @@ canvas.addEventListener("pointercancel", endDrag);
 canvas.addEventListener("wheel", (e) => {
   e.preventDefault();
   const factor = Math.exp(e.deltaY * 0.001);
-  view.scale = Math.min(8, Math.max(0.05, view.scale * factor));
+  view.scale = Math.min(30, Math.max(0.05, view.scale * factor));
 }, { passive: false });
 
 // ---- adjustable parameters ------------------------------------------------
@@ -333,6 +340,10 @@ const ADJUST: Record<string, Adjustable> = {
   lens: {
     name: "Lens",
     primary: { label: "amount", get: () => lens.amt, set: (v) => (lens.amt = v), step: 0.1, min: 0, max: 2, fmt: num },
+  },
+  autotempo: {
+    name: "Auto speed",
+    primary: { label: "rate", get: () => auto.rate, set: (v) => (auto.rate = v), step: 0.05, min: 0.1, max: 2, fmt: num },
   },
   spin: {
     name: "Spin",
@@ -479,11 +490,11 @@ function lfo(period: number, min: number, max: number, phase = 0) {
 
 function toggleAuto() {
   auto.on = !auto.on;
+  activeSetting = "autotempo"; // so Up/Down tunes the auto speed right away
   if (auto.on) {
     // Stagger first scene changes so they don't all fire at once on start.
     auto.triTimer = 60 + Math.random() * 40;
     auto.imgTimer = 120 + Math.random() * 90;
-    auto.bgTimer = 70 + Math.random() * 60;
     auto.lensTimer = 80 + Math.random() * 70;
     auto.laserTimer = 40 + Math.random() * 40;
     lasers.on = true;
@@ -494,36 +505,37 @@ function toggleAuto() {
 }
 
 function updateAuto(dt: number) {
-  auto.time += dt;
+  const r = auto.rate;
+  auto.time += dt * r;
 
   // Continuous, smoothly-evolving parameters. Long periods + gentle speed caps
-  // keep it a slow, chill exploration rather than a fast strobe. The "speed"
-  // params (warpSpeed, hueSpeed, panImgSpeed, spin) especially stay low — those
-  // drive how fast things shimmer/move, so high values read as vibrating.
-  view.scale = lfo(115, 0.55, 1.7, 0.0);
-  view.spin = lfo(140, -0.06, 0.06, 1.3);
+  // keep it a slow, chill exploration rather than a fast strobe. Every "speed"
+  // param (which drives how fast things shimmer/move) is also multiplied by the
+  // global auto.rate so a single knob slows the whole mood down.
+  view.scale = lfo(125, 0.6, 1.6, 0.0);
+  view.spin = lfo(150, -0.045, 0.045, 1.3) * r;
   // Roam across the background; layered long periods avoid retracing the path.
-  view.pan[0] = Math.sin(auto.time / 70) * 2.5 + Math.sin(auto.time / 33) * 0.45;
-  view.pan[1] = Math.cos(auto.time / 84) * 2.5 + Math.cos(auto.time / 39) * 0.45;
+  view.pan[0] = Math.sin(auto.time / 85) * 2.4 + Math.sin(auto.time / 40) * 0.4;
+  view.pan[1] = Math.cos(auto.time / 100) * 2.4 + Math.cos(auto.time / 46) * 0.4;
 
   // Effects stay enabled and breathe via their strength targets (which dip to
   // ~0 for stretches, reading as off) instead of hard on/off flips.
   fx.warpOn = true;
-  fx.warpStrength = Math.max(0, lfo(80, -0.4, 0.9, 0.0));
-  fx.warpSpeed = lfo(120, 0.07, 0.38, 1.0); // gentle ripple, not a vibration
+  fx.warpStrength = Math.max(0, lfo(95, -0.7, 0.7, 0.0)); // off ~half the time, gentler bulge
+  fx.warpSpeed = lfo(130, 0.04, 0.2, 1.0) * r;            // very slow ripple, not a vibration
   fx.glowOn = true;
-  fx.glowStrength = Math.max(0, lfo(65, -0.6, 2.0, 2.1));
-  fx.glowWidth = lfo(90, 1.5, 5.5, 0.5);
+  fx.glowStrength = Math.max(0, lfo(70, -0.6, 2.0, 2.1));
+  fx.glowWidth = lfo(95, 1.5, 5.5, 0.5);
   fx.hueOn = true;
-  fx.hueSpeed = lfo(150, -0.2, 0.28, 0.7); // slow colour drift
+  fx.hueSpeed = lfo(165, -0.15, 0.22, 0.7) * r;           // slow colour drift
   fx.panImgOn = true;
-  fx.panImgRange = lfo(85, 0.2, 1.0, 0.0);
-  fx.panImgSpeed = lfo(160, 0.02, 0.11, 1.4);
+  fx.panImgRange = lfo(90, 0.2, 1.0, 0.0);
+  fx.panImgSpeed = lfo(175, 0.02, 0.085, 1.4) * r;
 
   // Lasers ride along, breathing in and out so they're an accent, not constant.
   lasers.on = true;
-  lasers.glowTarget = Math.max(0, lfo(55, -0.7, 1.1, 1.0));
-  lasers.speed = lfo(110, 0.25, 0.75, 0.3);
+  lasers.glowTarget = Math.max(0, lfo(60, -0.7, 1.1, 1.0));
+  lasers.speed = lfo(120, 0.18, 0.5, 0.3) * r;
 
   // Discrete scene changes on independent random timers.
   if ((auto.triTimer -= dt) <= 0) {
@@ -534,14 +546,16 @@ function updateAuto(dt: number) {
     if (state.useTex && images.length > 1) cycleImage();
     auto.imgTimer = 150 + Math.random() * 150;
   }
-  // Swap between the procedural plasma and the image library, so auto mixes in
-  // the non-image background too (only flips to image when one exists).
-  if ((auto.bgTimer -= dt) <= 0) {
-    if (images.length > 0) {
-      state.useTex = !state.useTex;
-      if (state.useTex) loadImage(images[Math.max(0, imageIndex)], true);
+  // Background lock: if any images exist, auto stays on the image library and
+  // only cycles between them (never the procedural plasma); with none, it stays
+  // on the procedural plasma.
+  if (images.length > 0) {
+    if (!state.useTex) {
+      imageIndex = Math.max(0, imageIndex);
+      loadImage(images[imageIndex], true);
     }
-    auto.bgTimer = 75 + Math.random() * 75;
+  } else {
+    state.useTex = false;
   }
   if ((auto.lensTimer -= dt) <= 0) {
     lens.mode = (lens.mode + 1) % LENS_NAMES.length;
@@ -604,6 +618,10 @@ function frame(now: number) {
   gl!.uniform1f(loc.time, t);
   gl!.uniform2f(loc.pan, view.pan[0], view.pan[1]);
   gl!.uniform1f(loc.scale, view.scale);
+  // Use more fold passes the farther out/panned we are, so distant points still
+  // reflect all the way into the fundamental triangle. Cheap when zoomed in.
+  const extent = 1.6 * view.scale + Math.hypot(view.pan[0], view.pan[1]) + fx.warp;
+  gl!.uniform1i(loc.foldIters, Math.max(10, Math.min(48, Math.ceil(extent / 0.75) + 2)));
   gl!.uniform1f(loc.rot, view.rot);
   gl!.uniform2f(loc.n0, tri.n[0][0], tri.n[0][1]); gl!.uniform1f(loc.d0, tri.d[0]);
   gl!.uniform2f(loc.n1, tri.n[1][0], tri.n[1][1]); gl!.uniform1f(loc.d1, tri.d[1]);
@@ -623,6 +641,8 @@ function frame(now: number) {
   gl!.uniform1f(loc.laserGlow, lasers.glow);
   gl!.uniform1i(loc.lens, lens.mode);
   gl!.uniform1f(loc.lensAmt, lens.amt);
+  palettePhase += dt * PALETTE_SPEED;
+  gl!.uniform1f(loc.palette, palettePhase);
 
   gl!.activeTexture(gl!.TEXTURE0);
   gl!.bindTexture(gl!.TEXTURE_2D, texture);

@@ -47,6 +47,10 @@ uniform float uLaserGlow;
 uniform int   uLens;     // 0 none, 1 fisheye, 2 fly-eye, 3 prism
 uniform float uLensAmt;  // lens strength
 
+uniform int   uFoldIters; // fold passes; scaled with zoom-out so far points still fold
+
+uniform float uPalette;  // continuous palette phase (blends between presets)
+
 #define PI 3.14159265359
 
 vec2 reflectOut(vec2 p, vec2 n, float d){
@@ -59,7 +63,7 @@ vec2 reflectOut(vec2 p, vec2 n, float d){
 // reflection. The triangle's reflection group tiles the plane, so this
 // converges. This is the exact math of a 3-mirror kaleidoscope.
 vec2 fold(vec2 p){
-  for (int i = 0; i < 16; i++){
+  for (int i = 0; i < uFoldIters; i++){
     p = reflectOut(p, uN0, uD0);
     p = reflectOut(p, uN1, uD1);
     p = reflectOut(p, uN2, uD2);
@@ -67,8 +71,34 @@ vec2 fold(vec2 p){
   return p;
 }
 
+// Inigo Quilez cosine palettes: colour = a + b*cos(2pi*(c*t + d)). A bank of
+// presets we blend between (uPalette advances continuously), so the procedural
+// background drifts smoothly through many colour moods rather than one.
+#define NPAL 8
+const vec3 PAL_A[NPAL] = vec3[NPAL](
+  vec3(0.5, 0.5, 0.5), vec3(0.5, 0.5, 0.5), vec3(0.5, 0.5, 0.5), vec3(0.5, 0.5, 0.5),
+  vec3(0.5, 0.5, 0.5), vec3(0.8, 0.5, 0.4), vec3(0.5, 0.5, 0.5), vec3(0.6, 0.4, 0.5));
+const vec3 PAL_B[NPAL] = vec3[NPAL](
+  vec3(0.5, 0.5, 0.5), vec3(0.5, 0.5, 0.5), vec3(0.5, 0.5, 0.5), vec3(0.5, 0.5, 0.5),
+  vec3(0.5, 0.5, 0.5), vec3(0.2, 0.4, 0.2), vec3(0.5, 0.5, 0.5), vec3(0.4, 0.5, 0.3));
+const vec3 PAL_C[NPAL] = vec3[NPAL](
+  vec3(1.0, 1.0, 1.0), vec3(1.0, 1.0, 1.0), vec3(1.0, 1.0, 1.0), vec3(1.0, 1.0, 0.5),
+  vec3(2.0, 1.0, 0.0), vec3(2.0, 1.0, 1.0), vec3(1.0, 0.7, 0.4), vec3(1.0, 1.0, 1.0));
+const vec3 PAL_D[NPAL] = vec3[NPAL](
+  vec3(0.00, 0.33, 0.67), vec3(0.00, 0.10, 0.20), vec3(0.30, 0.20, 0.20), vec3(0.80, 0.90, 0.30),
+  vec3(0.50, 0.20, 0.25), vec3(0.00, 0.25, 0.25), vec3(0.00, 0.15, 0.20), vec3(0.55, 0.70, 0.85));
+
+vec3 cosPal(float t, int i){
+  return PAL_A[i] + PAL_B[i] * cos(2.0 * PI * (PAL_C[i] * t + PAL_D[i]));
+}
+
 vec3 palette(float t){
-  return 0.5 + 0.5 * cos(2.0 * PI * (t + vec3(0.0, 0.33, 0.67)));
+  float ph = uPalette;
+  float fl = floor(ph);
+  int i = int(mod(fl, float(NPAL)));
+  int j = int(mod(fl + 1.0, float(NPAL)));
+  float f = smoothstep(0.0, 1.0, fract(ph));
+  return mix(cosPal(t, i), cosPal(t, j), f);
 }
 
 vec3 proceduralBg(vec2 q){

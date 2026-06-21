@@ -63,6 +63,7 @@ then tune whatever you touched last. Up/Down = primary, Left/Right = secondary.
 | Hue (`C`)            | cycle speed     | static tint       |
 | Lasers (`L`)         | beam count      | sweep speed       |
 | Lens (`V`)           | amount          | —                 |
+| Auto speed (`A`)     | rate (tempo)    | —                 |
 | Spin (`R`)           | speed (signed)  | —                 |
 | Auto-drift (`Space`) | amount          | speed             |
 | Image drift (`M`)    | range           | speed             |
@@ -94,7 +95,9 @@ then tune whatever you touched last. Up/Down = primary, Left/Right = secondary.
 - **Image drift** (`M`) — slowly roams the sample point across a dropped image on a
   Lissajous loop, so the scope isn't locked onto one fixed section.
 - **Background** (`P`) — a layered animated plasma (default, zero assets), or any
-  image you drop in (persisted to `localStorage` across reloads).
+  image you drop in (persisted to `localStorage` across reloads). The procedural
+  plasma drifts continuously through a bank of 8 cosine palettes, cross-fading
+  smoothly (~33s each) so the colour mood keeps evolving on its own.
 
 All of the above are live-tunable with the arrow keys — see the Tuning table above.
 
@@ -114,7 +117,9 @@ on a screen. While active it:
   background with more than one image — cycle to the next image (~2.5-5min).
 
 Tuned for a slow, chill exploration — long LFO periods and gentle speed caps, so
-it morphs continuously without ever feeling fast or strobey.
+it morphs continuously without ever feeling fast or strobey. A single global
+**tempo** scales everything auto drives: press `A`, then `↑`/`↓` to slow it down
+or speed it up live (lower = calmer).
 
 Its motion clock only advances while auto is on, so toggling it pauses and
 resumes rather than jumping. Turning it off leaves everything where it landed;
