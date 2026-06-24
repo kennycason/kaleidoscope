@@ -36,6 +36,10 @@ Press the browser's fullscreen (F11 / ⌃⌘F) for recording.
 | `I`            | cycle to the next image in the dropped library |
 | `M`            | toggle image drift (roam the sample point across the image) |
 | `P`            | cycle background: procedural ↔ dropped image |
+| `B`            | toggle beat sync (tempo-locked pulsing — see below) |
+| `T`            | tap tempo — tap in rhythm to set the BPM |
+| `O`            | start / stop (and save) recording the canvas to a video file |
+| `Shift`+`O`    | discard the current take without saving / clear cached recording |
 | `H`            | hide / show the menu (use this while recording) |
 | `↑` / `↓`      | tune the **primary** knob of the last setting you touched |
 | `←` / `→`      | tune that setting's **secondary** knob |
@@ -47,6 +51,11 @@ Press the browser's fullscreen (F11 / ⌃⌘F) for recording.
 - `?clearImages` — wipes the saved image library from `localStorage` on load
   (also clears the legacy single-image key). Open the page once with this param
   to start fresh.
+- `?seed=<anything>` — makes the random start reproducible. Without it, every load
+  opens on a different random view (triangle, rotation, position, zoom, palette,
+  animation phase) and lasers/auto choices also vary. The seed used each load is
+  printed to the console (`[seed] …`), so if you land on a start you love, copy it
+  into `?seed=` to get it back. All randomness is routed through this seed.
 
 Every toggle flashes a small confirmation toast at the bottom of the screen
 (suppressed while the menu is hidden, for clean recordings).
@@ -64,6 +73,7 @@ then tune whatever you touched last. Up/Down = primary, Left/Right = secondary.
 | Lasers (`L`)         | beam count      | sweep speed       |
 | Lens (`V`)           | amount          | —                 |
 | Auto speed (`A`)     | rate (tempo)    | —                 |
+| BPM (`B`)            | tempo           | impact            |
 | Spin (`R`)           | speed (signed)  | —                 |
 | Auto-drift (`Space`) | amount          | speed             |
 | Image drift (`M`)    | range           | speed             |
@@ -111,10 +121,10 @@ on a screen. While active it:
   repeats and effects breathe smoothly in and out;
 - roams the sample point across the background on a layered Lissajous path;
 - fires occasional discrete scene changes on independent random timers: switch
-  triangle type (~70-150s), swap between the procedural plasma and the image
-  library (~75-150s, so the non-image background is in the mix too), cycle the
-  lens (~85-160s), change the laser beam count (~45-90s), and — on an image
-  background with more than one image — cycle to the next image (~2.5-5min).
+  triangle type (~70-150s), cycle the lens (~85-160s), change the laser beam
+  count (~45-90s), and cycle to the next image (~2.5-5min);
+- background follows your library: if any images are loaded, auto stays on them
+  and only cycles between them; with none, it stays on the procedural plasma.
 
 Tuned for a slow, chill exploration — long LFO periods and gentle speed caps, so
 it morphs continuously without ever feeling fast or strobey. A single global
@@ -124,6 +134,52 @@ or speed it up live (lower = calmer).
 Its motion clock only advances while auto is on, so toggling it pauses and
 resumes rather than jumping. Turning it off leaves everything where it landed;
 press `Z` to snap parameters back to defaults.
+
+### Beat sync (`B`) / tap tempo (`T`)
+
+Tempo-locked pulsing for playing along to music. `B` toggles it; set the tempo by
+nudging BPM (`B` then `↑`/`↓`) or by tapping `T` in rhythm (3-4 taps; tapping also
+re-aligns the downbeat). `←`/`→` set the **impact** (how hard the pulse hits).
+
+The trick to staying smooth at any BPM: it drives a continuous **beat phase**, not
+discrete triggers. Parameters are smooth functions of that phase — a gentle inward
+**zoom swell** and seam/laser flash on each beat (`sin²`, zero at beat boundaries
+so it never jumps) and a slower **warp swell** on each bar (4 beats). Even at fast
+techno tempos it breathes in time rather than strobing. Beat flashes only brighten
+glow/lasers when those effects are already on; the zoom/warp swell is always felt.
+
+This is the manual foundation; mic/app-audio beat detection can later phase-lock
+this same clock.
+
+### Recording (`O`)
+
+`O` starts/stops recording straight from the canvas via `MediaRecorder` +
+`captureStream` — the browser encodes off the main thread from the GPU canvas, so
+it's far lighter than a screen recorder and **captures only the kaleidoscope**, not
+the UI overlay. A red ● REC badge shows while active (even with the menu hidden).
+Tip: hide the menu with `H` before recording for a clean shot.
+
+**It never buffers the whole recording in RAM** (that ballooned to gigabytes and
+crashed the tab on long takes). Each 1-second chunk is persisted as it arrives, via
+one of two paths — the REC badge tells you which:
+
+- **`REC → disk`** — File System Access API: `O` opens a save dialog and chunks
+  stream straight to that file (Chromium / Chrome / Edge over `localhost` or HTTPS).
+- **`REC → cache`** — IndexedDB: chunks are written to on-disk browser storage off
+  the JS heap, then assembled and downloaded when you stop. Works anywhere IndexedDB
+  exists (Arc, Safari, Firefox). **Crash-safe:** if the tab dies mid-take, the next
+  load shows a green **"⤓ recover last recording"** button (top-right) to download
+  what was captured.
+- **`REC (memory)`** — last-resort in-RAM buffer (only if both above fail); keep
+  takes short.
+
+If a Chromium disk recording crashes, the partial file is also recoverable from the
+sibling `*.crswap` file Chrome leaves behind (remux with `ffmpeg -i in -c copy out`).
+
+**Reset / discard** (`Shift`+`O`): while recording, stops the take *without* saving;
+when not recording, clears any cached/recoverable recording so you start clean. (For
+the `REC → disk` path the file you picked already exists on disk, so a discarded one
+stays there — delete it manually.)
 
 ## Ideas for more effects (backlog)
 

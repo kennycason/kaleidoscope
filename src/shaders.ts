@@ -49,9 +49,20 @@ uniform float uLensAmt;  // lens strength
 
 uniform int   uFoldIters; // fold passes; scaled with zoom-out so far points still fold
 
+uniform int   uFoldMode;  // 0 triangle mirrors, 1 mandala (N-fold), 2 spiral, 3 mirror box
+uniform float uSegments;  // wedge count for mandala / spiral
+
 uniform float uPalette;  // continuous palette phase (blends between presets)
 
+// Coloring post-process (in addition to hue).
+uniform float uSat;       // saturation (1 = neutral)
+uniform float uContrast;  // contrast (1 = neutral)
+uniform float uPosterize; // 0 = off, else number of levels
+uniform float uSolarize;  // 0..1 invert-above-threshold blend
+uniform float uGradMap;   // 0..1 recolor by luminance through the palette bank
+
 #define PI 3.14159265359
+#define TWO_PI 6.28318530718
 
 vec2 reflectOut(vec2 p, vec2 n, float d){
   // Reflect across the line dot(p,n)=d only when the point is outside it.
@@ -59,16 +70,50 @@ vec2 reflectOut(vec2 p, vec2 n, float d){
   return p - 2.0 * max(s, 0.0) * n;
 }
 
-// Fold any plane point into the fundamental triangle by repeated mirror
-// reflection. The triangle's reflection group tiles the plane, so this
-// converges. This is the exact math of a 3-mirror kaleidoscope.
-vec2 fold(vec2 p){
+// Triangle fold: repeated mirror reflection into the fundamental triangle. The
+// triangle's reflection group tiles the plane, so this converges — the exact
+// math of a 3-mirror kaleidoscope.
+vec2 foldTri(vec2 p){
   for (int i = 0; i < uFoldIters; i++){
     p = reflectOut(p, uN0, uD0);
     p = reflectOut(p, uN1, uD1);
     p = reflectOut(p, uN2, uD2);
   }
   return p;
+}
+
+// Mandala fold: dihedral N-fold symmetry about the origin (the classic round
+// tube-kaleidoscope). Fold the angle into one wedge and mirror within it.
+vec2 foldPolar(vec2 p){
+  float r = length(p);
+  float a = atan(p.y, p.x);
+  float k = TWO_PI / uSegments;
+  a = mod(a, k);
+  a = abs(a - 0.5 * k);
+  return r * vec2(cos(a), sin(a));
+}
+
+// Spiral fold: same N-fold mandala but the angle is twisted by log-radius, so
+// the wedges wind into an endless spiral.
+vec2 foldSpiral(vec2 p){
+  float r = length(p);
+  float a = atan(p.y, p.x) + log(r + 1e-3) * 0.5;
+  float k = TWO_PI / uSegments;
+  a = mod(a, k);
+  a = abs(a - 0.5 * k);
+  return r * vec2(cos(a), sin(a));
+}
+
+// Mirror-box fold: reflect across a square grid — a hall-of-mirrors cube.
+vec2 foldBox(vec2 p){
+  return abs(mod(p, 2.0) - 1.0);
+}
+
+vec2 fold(vec2 p){
+  if (uFoldMode == 1) return foldPolar(p);
+  if (uFoldMode == 2) return foldSpiral(p);
+  if (uFoldMode == 3) return foldBox(p);
+  return foldTri(p);
 }
 
 // Inigo Quilez cosine palettes: colour = a + b*cos(2pi*(c*t + d)). A bank of
@@ -154,6 +199,41 @@ vec2 hexNearest(vec2 p){
   return dot(a, a) < dot(b, b) ? p - a : p - b;
 }
 
+vec2 hash2(vec2 p){
+  p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
+  return fract(sin(p) * 43758.5453);
+}
+
+// Voronoi "shatter": pull each point toward the nearest random cell centre, so
+// the view fractures into irregular glass shards.
+vec2 voronoiWarp(vec2 uv, float amt){
+  vec2 sp = uv * 6.0;
+  vec2 g = floor(sp);
+  vec2 f = fract(sp);
+  float md = 8.0;
+  vec2 mCenter = sp;
+  for (int j = -1; j <= 1; j++){
+    for (int i = -1; i <= 1; i++){
+      vec2 o = vec2(float(i), float(j));
+      vec2 c = o + hash2(g + o) - f;
+      float d = dot(c, c);
+      if (d < md){ md = d; mCenter = g + o + hash2(g + o); }
+    }
+  }
+  return mix(uv, mCenter / 6.0, clamp(amt, 0.0, 1.0) * 0.85);
+}
+
+// Glass tiles: a grid of little convex facets that magnify + bevel.
+vec2 glassTiles(vec2 uv, float amt){
+  float sc = 6.0;
+  vec2 g = uv * sc;
+  vec2 cell = floor(g) + 0.5;
+  vec2 local = g - cell;
+  local *= 1.0 - clamp(amt, 0.0, 1.0) * 0.6;
+  local += 0.12 * amt * sin(local * TWO_PI);
+  return (cell + local) / sc;
+}
+
 // Pre-filter "lens" distortions applied to the screen coordinate before it
 // becomes a world point — like looking into the scope through a shaped lens.
 vec2 applyLens(vec2 uv){
@@ -166,6 +246,26 @@ vec2 applyLens(vec2 uv){
     vec2 c = hexNearest(q);
     vec2 local = q - c;
     uv = (c + local * (1.0 - clamp(uLensAmt, 0.0, 1.0) * 0.7)) / sc;
+  } else if (uLens == 4){     // swirl / vortex
+    float r = length(uv);
+    float a = uLensAmt * 2.5 * r;
+    float cs = cos(a), sn = sin(a);
+    uv = mat2(cs, -sn, sn, cs) * uv;
+  } else if (uLens == 5){     // tunnel (log-polar)
+    float r = length(uv) + 1e-4;
+    float a = atan(uv.y, uv.x);
+    uv = vec2(a / PI, -log(r)) * (0.55 + uLensAmt * 0.5);
+  } else if (uLens == 6){     // ripple / droplet
+    float r = length(uv);
+    float w = sin(r * 22.0 - uTime * 2.0) * 0.03 * uLensAmt;
+    uv += normalize(uv + 1e-5) * w;
+  } else if (uLens == 7){     // pinch / bulge
+    float r2 = dot(uv, uv);
+    uv *= 1.0 + uLensAmt * 0.7 * r2;
+  } else if (uLens == 8){     // voronoi shatter
+    uv = voronoiWarp(uv, uLensAmt);
+  } else if (uLens == 9){     // glass tiles
+    uv = glassTiles(uv, uLensAmt);
   }
   return uv;
 }
@@ -196,11 +296,9 @@ void main(){
     col = sampleBg(p);
   }
 
-  // Neon edge glow: light up the kaleidoscope's mirror seams. The folded point
-  // sits inside the fundamental triangle, so the distance to its nearest edge is
-  // ~0 exactly along the reflection seams. fwidth keeps the line a constant
-  // thickness on screen regardless of zoom.
-  if (uGlow > 0.0001){
+  // Neon edge glow: light up the triangle's mirror seams (only meaningful for
+  // the triangle fold, whose edges are uN/uD).
+  if (uGlow > 0.0001 && uFoldMode == 0){
     float eDist = min(uD0 - dot(p, uN0), min(uD1 - dot(p, uN1), uD2 - dot(p, uN2)));
     float w = fwidth(eDist) + 1e-5;
     float line = 1.0 - smoothstep(0.0, uGlowWidth * w, eDist);
@@ -208,7 +306,24 @@ void main(){
     col += uGlow * 1.4 * line * neon;
   }
 
+  // Recolor by luminance through the palette bank (works on any source).
+  if (uGradMap > 0.001){
+    float l = clamp(dot(col, vec3(0.299, 0.587, 0.114)), 0.0, 1.0);
+    col = mix(col, palette(l), uGradMap);
+  }
   if (abs(uHue) > 0.0001) col = hueShift(col, uHue);
+  // Saturation, contrast, posterize, solarize.
+  float luma = dot(col, vec3(0.299, 0.587, 0.114));
+  col = mix(vec3(luma), col, uSat);
+  col = (col - 0.5) * uContrast + 0.5;
+  if (uPosterize >= 2.0){
+    col = floor(col * (uPosterize - 1.0) + 0.5) / (uPosterize - 1.0);
+  }
+  if (uSolarize > 0.001){
+    vec3 sol = mix(col, 1.0 - col, step(vec3(0.5), col));
+    col = mix(col, sol, uSolarize);
+  }
+  col = clamp(col, 0.0, 1.0);
 
   // Lasers: each is a line in fundamental-domain space, so testing the folded
   // point makes the beam reflect off the mirror walls and tile through the

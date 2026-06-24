@@ -8,22 +8,82 @@
       :root { color-scheme: dark; }
       * { box-sizing: border-box; }
       html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
-      #gl, #fx { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
-      #gl { cursor: grab; touch-action: none; }
+      #gl { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; cursor: grab; touch-action: none; }
       #gl.dragging { cursor: grabbing; }
-      #fx { pointer-events: none; z-index: 2; }
 
-      #hud {
-        position: fixed; top: 12px; left: 12px;
-        font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
-        color: #eee; background: rgba(0,0,0,0.45);
-        backdrop-filter: blur(8px);
-        border: 1px solid rgba(255,255,255,0.12);
-        border-radius: 10px; padding: 12px 14px; max-width: 260px;
-        user-select: none; z-index: 3;
-        transition: opacity 0.25s ease;
+      #toolbar {
+        position: fixed; top: 12px; left: 12px; z-index: 5; width: 232px;
+        max-height: 92vh; overflow-y: auto;
+        background: rgba(10,10,16,0.82); backdrop-filter: blur(10px);
+        border: 1px solid rgba(255,255,255,0.14); border-radius: 12px;
+        color: #eee; font: 11px ui-monospace, SFMono-Regular, Menlo, monospace;
+        user-select: none; box-shadow: 0 8px 30px rgba(0,0,0,0.4);
       }
-      #hud.hidden { opacity: 0; pointer-events: none; }
+      #toolbar.hidden { display: none; }
+      #tbHead {
+        position: sticky; top: 0; z-index: 1; cursor: move;
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 6px 10px; font-weight: 700; font-size: 10px;
+        letter-spacing: 0.07em; text-transform: uppercase;
+        background: rgba(10,10,16,0.96);
+        border-bottom: 1px solid rgba(255,255,255,0.1); border-radius: 12px 12px 0 0;
+      }
+      #tbHide { cursor: pointer; opacity: 0.55; font-size: 10px; }
+      #tbHide:hover { opacity: 1; }
+      #tbBody { padding: 5px 8px 7px; display: flex; flex-direction: column; gap: 2px; }
+      .tb-sec {
+        margin-top: 2px; opacity: 0.4; font-size: 8px;
+        letter-spacing: 0.1em; text-transform: uppercase;
+      }
+      .tb-sec:first-child { margin-top: 0; }
+      .tb-row { display: flex; gap: 3px; align-items: center; }
+      .tb-btn {
+        flex: 1 1 0; min-width: 0; padding: 4px 6px; border-radius: 6px;
+        background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12);
+        color: #ddd; cursor: pointer; font: 10px ui-monospace, monospace;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center;
+      }
+      .tb-btn:hover { background: rgba(255,255,255,0.16); }
+      .tb-btn.on { background: #2bd17e; color: #04140c; border-color: #2bd17e; font-weight: 700; }
+      .tb-btn.rec { background: #ff2d2d; color: #fff; border-color: #ff2d2d; font-weight: 700; }
+      .tb-knob-col { display: flex; flex-direction: column; align-items: center; width: 31px; flex: 0 0 auto; }
+      .tb-knob {
+        width: 22px; height: 22px; border-radius: 50%; position: relative; cursor: ns-resize;
+        background: radial-gradient(circle at 50% 35%, #3a3f4d, #14161d);
+        border: 1px solid rgba(255,255,255,0.18);
+        box-shadow: inset 0 1px 2px rgba(255,255,255,0.12); touch-action: none;
+      }
+      .tb-knob.auto {
+        background: radial-gradient(circle at 50% 35%, #6f86b8, #2c3a5e);
+        border-color: #6cc4ff; box-shadow: 0 0 7px rgba(108,196,255,0.65);
+      }
+      .tb-knob .ind { position: absolute; inset: 0; }
+      .tb-knob .ind::before {
+        content: ''; position: absolute; left: 50%; top: 2px; width: 2px; height: 7px;
+        margin-left: -1px; background: #6cc4ff; border-radius: 1px; box-shadow: 0 0 4px #6cc4ff;
+      }
+      .tb-knob-val { font-size: 8px; color: #fff; line-height: 1; }
+      .tb-knob-name { font-size: 7px; opacity: 0.45; text-transform: uppercase; letter-spacing: 0.03em; line-height: 1; }
+      .tb-select {
+        flex: 1 1 auto; min-width: 0; background: rgba(255,255,255,0.08); color: #eee;
+        border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; padding: 5px;
+        font: 10px ui-monospace, monospace; cursor: pointer;
+      }
+      .tb-select.auto { border-color: #6cc4ff; box-shadow: 0 0 6px rgba(108,196,255,0.5); color: #bfe6ff; }
+      .tb-imgs { display: grid; grid-template-columns: repeat(6, 1fr); gap: 3px; margin-top: 2px; }
+      .tb-thumb {
+        width: 100%; aspect-ratio: 1 / 1; object-fit: cover; border-radius: 3px; cursor: pointer;
+        border: 2px solid transparent; opacity: 0.7;
+      }
+      .tb-thumb:hover { opacity: 1; }
+      .tb-thumb.sel { border-color: #2bd17e; opacity: 1; }
+      .tb-trash {
+        width: 100%; aspect-ratio: 1 / 1; border-radius: 3px; cursor: pointer; padding: 0;
+        display: flex; align-items: center; justify-content: center; font-size: 13px;
+        background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.14); color: #ff8a8a;
+      }
+      .tb-trash:hover { background: rgba(255,45,45,0.28); border-color: #ff2d2d; color: #fff; }
+      .tb-empty { grid-column: 1 / -1; opacity: 0.4; font-size: 9px; padding: 4px 0; text-align: center; }
       #toast {
         position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%);
         font: 600 13px ui-monospace, monospace; letter-spacing: 0.04em;
@@ -33,13 +93,32 @@
         opacity: 0; transition: opacity 0.2s ease; pointer-events: none;
       }
       #toast.show { opacity: 1; }
-      #hud h1 { font-size: 13px; margin: 0 0 8px; letter-spacing: 0.08em; text-transform: uppercase; }
-      #hud .row { display: flex; justify-content: space-between; gap: 10px; opacity: 0.85; }
-      #hud kbd {
-        background: rgba(255,255,255,0.12); border-radius: 4px;
-        padding: 1px 5px; font-size: 11px;
+      #rec {
+        position: fixed; top: 14px; right: 16px; z-index: 5;
+        display: none; align-items: center; gap: 8px;
+        font: 600 12px ui-monospace, monospace; color: #fff;
+        background: rgba(0,0,0,0.5); padding: 6px 12px; border-radius: 999px;
       }
-      #hud .hint { margin-top: 8px; opacity: 0.6; font-size: 11px; }
+      #rec.show { display: flex; }
+      #rec .dot {
+        width: 10px; height: 10px; border-radius: 50%; background: #ff2d2d;
+        animation: recblink 1s steps(2, start) infinite;
+      }
+      @keyframes recblink { 50% { opacity: 0.2; } }
+      #recover {
+        position: fixed; top: 14px; right: 16px; z-index: 6; display: none;
+        align-items: center; gap: 10px;
+        font: 600 12px ui-monospace, monospace; color: #fff;
+        background: rgba(40,90,60,0.85); border: 1px solid rgba(255,255,255,0.25);
+        padding: 7px 8px 7px 13px; border-radius: 999px;
+      }
+      #recover.show { display: flex; }
+      #recoverGo { cursor: pointer; }
+      #recoverX {
+        cursor: pointer; opacity: 0.7; padding: 0 5px; border-radius: 50%;
+        line-height: 1;
+      }
+      #recoverX:hover { opacity: 1; background: rgba(255,255,255,0.18); }
       #drop {
         position: fixed; inset: 0; display: none;
         align-items: center; justify-content: center;
@@ -49,28 +128,17 @@
       }
       #drop.show { display: flex; }
     </style>
-    <script type="module" crossorigin src="/assets/index-D7NTtHjP.js"></script>
+    <script type="module" crossorigin src="./assets/index-Bsmmg-xM.js"></script>
   </head>
   <body>
     <canvas id="gl"></canvas>
-    <canvas id="fx"></canvas>
-    <div id="hud">
-      <h1>Kaleidoscope</h1>
-      <div class="row"><span>drag</span><span>pan chamber</span></div>
-      <div class="row"><span>wheel</span><span>zoom</span></div>
-      <div class="row"><span><kbd>Space</kbd></span><span>auto-drift</span></div>
-      <div class="row"><span><kbd>R</kbd></span><span>spin</span></div>
-      <div class="row"><span><kbd>1</kbd>/<kbd>2</kbd></span><span>triangle type</span></div>
-      <div class="row"><span><kbd>L</kbd></span><span>electric arcs</span></div>
-      <div class="row"><span><kbd>W</kbd></span><span>warp mirror</span></div>
-      <div class="row"><span><kbd>G</kbd></span><span>neon edge glow</span></div>
-      <div class="row"><span><kbd>C</kbd></span><span>hue cycle</span></div>
-      <div class="row"><span><kbd>P</kbd></span><span>procedural / image bg</span></div>
-      <div class="row"><span><kbd>M</kbd></span><span>drift across image</span></div>
-      <div class="row"><span><kbd>H</kbd></span><span>hide this menu</span></div>
-      <div class="hint">drop an image anywhere to use it as the background</div>
+    <div id="toolbar">
+      <div id="tbHead"><span>Kaleidoscope</span><span id="tbHide" title="hide (T)">T &times;</span></div>
+      <div id="tbBody"></div>
     </div>
     <div id="toast"></div>
+    <div id="rec"><span class="dot"></span><span id="recLabel">REC</span></div>
+    <div id="recover"><span id="recoverGo">⤓ recover last recording</span><span id="recoverX" title="dismiss (keeps the cached recording)">✕</span></div>
     <div id="drop">drop image to load</div>
   </body>
 </html>
