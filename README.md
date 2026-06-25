@@ -1,5 +1,7 @@
 # Kaleidoscope
 
+**▶ [Live demo: kennycason.com/kaleidoscope](https://kennycason.com/kaleidoscope/)**
+
 A live, GPU-rendered mirror kaleidoscope. A triangle of mirrors is mathematically
 identical to reflecting the plane across the triangle's three sides forever, which
 tiles the whole plane. Instead of simulating bouncing light, the fragment shader does
@@ -7,6 +9,27 @@ the inverse: for every screen pixel it "folds" the coordinate back into the fund
 triangle, then samples the background there. That's a per-pixel GPU operation, so it
 runs at 60fps and the whole thing is effectively a real three-mirror scope you scroll a
 background through.
+
+## Gallery
+
+<img src="screenshots/Kaleidoscope_Metroid_01.png" width="49%"/><img src="screenshots/Kaleidoscope_Metroid.png" width="49%"/>
+<img src="screenshots/Kaleidoscope_Metroid_02.png" width="49%"/><img src="screenshots/Kaleidoscope_Metroid_03.png" width="49%"/>
+<img src="screenshots/Kaleidoscope_Metroid_04.png" width="49%"/><img src="screenshots/Kaleidoscope_Metroid_05.png" width="49%"/>
+<img src="screenshots/Kaleidoscope_June_22_2026_1.png" width="49%"/><img src="screenshots/Kaleidoscope_June_22_2026_2.png" width="49%"/>
+<img src="screenshots/Kaleidoscope_June_23_2026.png" width="49%"/><img src="screenshots/Kaleidoscope_June_23_2026_2.png" width="49%"/>
+<img src="screenshots/Kaleidoscope_June_23_2026_3.png" width="49%"/><img src="screenshots/Kaleidoscope_June_23_2026_5.png" width="49%"/>
+<img src="screenshots/Kaleidoscope_June_23_2026_11.png" width="49%"/><img src="screenshots/Kaleidoscope_June_23_2026_13.png" width="49%"/>
+<img src="screenshots/Kaleidoscope_June_23_2026_14.png" width="49%"/><img src="screenshots/Kaleidoscope_June_23_2026_17.png" width="49%"/>
+<img src="screenshots/Kaleidoscope_June_23_2026_18.png" width="49%"/><img src="screenshots/Kaleidoscope_June_23_2026_19.png" width="49%"/>
+<img src="screenshots/Kaleidoscope_June_23_2026_20.png" width="49%"/><img src="screenshots/Kaleidoscope_June_23_2026_21.png" width="49%"/>
+<img src="screenshots/Kaleidoscope_June_23_2026_22.png" width="49%"/><img src="screenshots/Kaleidoscope_June_23_2026_23.png" width="49%"/>
+<img src="screenshots/Kaleidoscope_June_23_2026_24.png" width="49%"/><img src="screenshots/Kaleidoscope_June_23_2026_25.png" width="49%"/>
+<img src="screenshots/Kaleidoscope_June_24_2026.png" width="49%"/><img src="screenshots/Kaleidoscope_June_24_2026_1.png" width="49%"/>
+<img src="screenshots/Kaleidoscope_June_24_2026_2.png" width="49%"/><img src="screenshots/Kaleidoscope_June_24_2026_3.png" width="49%"/>
+<img src="screenshots/Kaleidoscope_June_24_2026_4.png" width="49%"/><img src="screenshots/Kaleidoscope_June_24_2026_5.png" width="49%"/>
+<img src="screenshots/Kaleidoscope_June_24_2026_6.png" width="49%"/><img src="screenshots/Kaleidoscope_June_24_2026_7.png" width="49%"/>
+<img src="screenshots/Kaleidoscope_June_24_2026_9.png" width="49%"/><img src="screenshots/Kaleidoscope_June_24_2026_10.png" width="49%"/>
+<img src="screenshots/Kaleidoscope_June_24_2026_11.png" width="49%"/>
 
 ## Run
 
