@@ -1095,6 +1095,71 @@ function resetAll() {
   toast("Reset to defaults");
 }
 
+// Output size: render at an exact resolution (letterboxed) so screenshots and
+// recordings come out at that size, or "fit" the window.
+const dims = { mode: "fit" as "fit" | "fixed", w: 1920, h: 1080 };
+const SIZES: [string, number, number][] = [
+  ["Fit window", 0, 0],
+  ["1920 × 1080", 1920, 1080],
+  ["1280 × 720", 1280, 720],
+  ["3840 × 2160 (4K)", 3840, 2160],
+  ["1080 × 1080 (square)", 1080, 1080],
+  ["1080 × 1920 (vertical)", 1080, 1920],
+  ["1280 × 960 (4:3)", 1280, 960],
+  ["640 × 480", 640, 480],
+];
+
+tbSection("Output size");
+const sizeSel = document.createElement("select");
+sizeSel.className = "tb-select";
+SIZES.forEach(([name], i) => {
+  const o = document.createElement("option");
+  o.value = String(i);
+  o.textContent = name;
+  sizeSel.appendChild(o);
+});
+const customOpt = document.createElement("option");
+customOpt.value = "custom";
+customOpt.textContent = "Custom";
+sizeSel.appendChild(customOpt);
+
+const wIn = document.createElement("input");
+wIn.type = "number"; wIn.className = "tb-num"; wIn.min = "16"; wIn.step = "1";
+const hIn = document.createElement("input");
+hIn.type = "number"; hIn.className = "tb-num"; hIn.min = "16"; hIn.step = "1";
+const xSpan = document.createElement("span");
+xSpan.className = "tb-x"; xSpan.textContent = "×";
+
+function matchSizePreset() {
+  if (dims.mode === "fit") { sizeSel.value = "0"; return; }
+  const idx = SIZES.findIndex(([, w, h]) => w === dims.w && h === dims.h);
+  sizeSel.value = idx >= 0 ? String(idx) : "custom";
+}
+sizeSel.onchange = () => {
+  if (sizeSel.value !== "custom") {
+    const [, w, h] = SIZES[+sizeSel.value];
+    if (w === 0) dims.mode = "fit";
+    else { dims.mode = "fixed"; dims.w = w; dims.h = h; }
+  } else {
+    dims.mode = "fixed";
+  }
+  resize();
+};
+const applyManual = () => {
+  const w = Math.max(16, Math.round(+wIn.value || 0));
+  const h = Math.max(16, Math.round(+hIn.value || 0));
+  if (w >= 16 && h >= 16) { dims.mode = "fixed"; dims.w = w; dims.h = h; resize(); matchSizePreset(); }
+};
+wIn.onchange = applyManual;
+hIn.onchange = applyManual;
+tbRow(sizeSel);
+tbRow(wIn, xSpan, hIn);
+refreshers.push(() => {
+  if (document.activeElement !== sizeSel) matchSizePreset();
+  if (document.activeElement !== wIn) wIn.value = String(dims.w);
+  if (document.activeElement !== hIn) hIn.value = String(dims.h);
+});
+
 tbSection("Capture");
 tbRow(tbButton(() => "📷 Screenshot (PNG)", () => takeScreenshot()));
 const recBtn = tbButton(() => (recorder ? "■ Stop & save" : "● Record"), () => toggleRecord());
@@ -1131,6 +1196,8 @@ function toggleToolbar() {
 }
 (document.getElementById("tbHide") as HTMLSpanElement).addEventListener("click", toggleToolbar);
 window.addEventListener("keydown", (e) => {
+  const tag = (document.activeElement as HTMLElement | null)?.tagName;
+  if (tag === "INPUT" || tag === "SELECT") return; // don't steal keys while typing
   if (e.key.toLowerCase() === "t") toggleToolbar();
 });
 // ---- settings persistence -------------------------------------------------
@@ -1157,6 +1224,7 @@ function saveSettings() {
       beat: { on: beat.on, bpm: beat.bpm, impact: beat.impact },
       auto: { on: auto.on, rate: auto.rate, imgHold: auto.imgHold },
       zoomCfg: { ...zoomCfg }, shapeCycle: { ...shapeCycle }, lensCycle: { ...lensCycle },
+      dims: { ...dims },
       paramAuto: [...paramAuto].map((k) => knobToId.get(k)).filter(Boolean),
     };
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
@@ -1176,6 +1244,7 @@ function loadSettings() {
     if (s.zoomCfg) Object.assign(zoomCfg, s.zoomCfg);
     if (s.shapeCycle) Object.assign(shapeCycle, s.shapeCycle);
     if (s.lensCycle) Object.assign(lensCycle, s.lensCycle);
+    if (s.dims) Object.assign(dims, s.dims);
     // Don't auto-resume global Auto mode on load — it would silently override
     // manual controls (e.g. zoom). Restore its tunables only.
     if (s.auto) { auto.rate = s.auto.rate ?? auto.rate; auto.imgHold = s.auto.imgHold ?? auto.imgHold; }
@@ -1208,14 +1277,34 @@ window.addEventListener("drop", (e) => {
 });
 
 // ---- resize ---------------------------------------------------------------
+// "fit" fills the window (buffer = window × dpr). "fixed" renders at an exact
+// resolution (so screenshots/recordings are exactly that size), scaled to fit the
+// window and letterboxed on the black background — browsers can't resize the real
+// window, so we size the canvas instead.
 function resize() {
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  const w = Math.floor(canvas.clientWidth * dpr);
-  const h = Math.floor(canvas.clientHeight * dpr);
-  if (canvas.width !== w || canvas.height !== h) {
-    canvas.width = w;
-    canvas.height = h;
+  const vw = window.innerWidth, vh = window.innerHeight;
+  let bufW: number, bufH: number, cssW: number, cssH: number;
+  if (dims.mode === "fixed") {
+    bufW = dims.w;
+    bufH = dims.h;
+    const scale = Math.min(vw / bufW, vh / bufH);
+    cssW = Math.round(bufW * scale);
+    cssH = Math.round(bufH * scale);
+  } else {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    bufW = Math.floor(vw * dpr);
+    bufH = Math.floor(vh * dpr);
+    cssW = vw;
+    cssH = vh;
   }
+  if (canvas.width !== bufW || canvas.height !== bufH) {
+    canvas.width = bufW;
+    canvas.height = bufH;
+  }
+  canvas.style.width = `${cssW}px`;
+  canvas.style.height = `${cssH}px`;
+  canvas.style.left = `${Math.round((vw - cssW) / 2)}px`;
+  canvas.style.top = `${Math.round((vh - cssH) / 2)}px`;
   gl!.viewport(0, 0, canvas.width, canvas.height);
 }
 window.addEventListener("resize", resize);
